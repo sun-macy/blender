@@ -18,6 +18,7 @@ set(INC_SYS
   ${JPEG_INCLUDE_DIR}
   ${ZLIB_INCLUDE_DIRS}
   ${OPENIMAGEIO_INCLUDE_DIRS}
+  ../../../extern/rlbox
 )
 
 set(SRC
@@ -72,6 +73,24 @@ set(SRC
 
   # orphan include
   ../../../intern/ffmpeg/ffmpeg_compat.h
+
+  # Header only library.
+  ../../../extern/rlbox/rlbox.hpp
+  ../../../extern/rlbox/rlbox_app_pointer.hpp
+  ../../../extern/rlbox/rlbox_conversion.hpp
+  ../../../extern/rlbox/rlbox_dylib_sandbox.hpp
+  ../../../extern/rlbox/rlbox_helpers.hpp
+  ../../../extern/rlbox/rlbox_noop_sandbox.hpp
+  ../../../extern/rlbox/rlbox_policy_types.hpp
+  ../../../extern/rlbox/rlbox_range.hpp
+  ../../../extern/rlbox/rlbox_sandbox.hpp
+  ../../../extern/rlbox/rlbox_stdlib.hpp
+  ../../../extern/rlbox/rlbox_stdlib_polyfill.hpp
+  ../../../extern/rlbox/rlbox_struct_support.hpp
+  ../../../extern/rlbox/rlbox_type_traits.hpp
+  ../../../extern/rlbox/rlbox_types.hpp
+  ../../../extern/rlbox/rlbox_unwrap.hpp
+  ../../../extern/rlbox/rlbox_wrapper_traits.hpp
 )
 
 set(LIB
