@@ -99,9 +99,9 @@ void CamerasExporter::operator()(Object *ob, Scene *sce)
 }
 bool CamerasExporter::exportBlenderProfile(COLLADASW::Camera &cm,Camera *cam)
 {
-	cm.addExtraTechniqueParameter("blender","shiftx",cam->shiftx);
-	cm.addExtraTechniqueParameter("blender","shifty",cam->shifty);
-	cm.addExtraTechniqueParameter("blender","YF_dofdist",cam->YF_dofdist);
+	//cm.addExtraTechniqueParameter("blender","shiftx",cam->shiftx);
+	//cm.addExtraTechniqueParameter("blender","shifty",cam->shifty);
+	//cm.addExtraTechniqueParameter("blender","YF_dofdist",cam->YF_dofdist);
 	return true;
 
 }
