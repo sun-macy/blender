@@ -10,7 +10,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+ *b
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,6 +32,9 @@
  */
 
 #include "png.h"
+
+#include "rlbox.hpp"
+#include "rlbox_noop_sandbox.hpp"
 
 #include "BLI_utildefines.h"
 #include "BLI_fileops.h"
@@ -67,7 +70,7 @@ BLI_INLINE unsigned short UPSAMPLE_8_TO_16(const unsigned char _val)
 	return (_val << 8) + _val;
 }
 
-int imb_is_a_png(const unsigned char *mem)
+in(const unsigned char *mem)
 {
 	int ret_val = 0;
 
@@ -102,7 +105,7 @@ static void WriteData(png_structp png_ptr, png_bytep data, png_size_t length)
 
 static void ReadData(png_structp png_ptr, png_bytep data, png_size_t length)
 {
-	PNGReadStruct *rs = (PNGReadStruct *) png_get_io_ptr(png_ptr);
+	PNGReadStruct *rs = (PNGReadStruct *) png_get_io_ptr(png_ptr); // library function
 
 	if (rs) {
 		if (length <= rs->size - rs->seek) {
@@ -491,9 +494,10 @@ int imb_savepng(struct ImBuf *ibuf, const char *name, int flags)
 		fclose(fp);
 	}
 
-	return(1);
+	return(1);f
 }
 
+	// TODO: register potential callback!!
 static void imb_png_warning(png_structp UNUSED(png_ptr), png_const_charp message)
 {
 	/* We suppress iCCP warnings. That's how Blender always used to behave,
@@ -506,6 +510,7 @@ static void imb_png_warning(png_structp UNUSED(png_ptr), png_const_charp message
 	fprintf(stderr, "libpng warning: %s\n", message);
 }
 
+	// TODO: register potential callback!!
 static void imb_png_error(png_structp UNUSED(png_ptr), png_const_charp message)
 {
 	fprintf(stderr, "libpng error: %s\n", message);
@@ -528,22 +533,37 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 	float *to_float;
 	unsigned int channels;
 
+	// TODO: create sandbox
+	
+
+	// TODO: pass mem into sandbox
+
+
+	// TODO: pass sandbox into this function...
 	if (imb_is_a_png(mem) == 0) return(NULL);
 
 	/* both 8 and 16 bit PNGs are default to standard byte colorspace */
 	colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
+	// TODO: add tainting
+	// TODO: sandbox function call
 	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
 	                                 NULL, NULL, NULL);
+	// TODO: change if condition
 	if (png_ptr == NULL) {
 		printf("Cannot png_create_read_struct\n");
 		return NULL;
 	}
 
+	// TODO: sandbox function call
+	// TODO: register potential callback
 	png_set_error_fn(png_ptr, NULL, imb_png_error, imb_png_warning);
 
+	// TODO: sandbox function call
 	info_ptr = png_create_info_struct(png_ptr);
+	// TODO: change if condition
 	if (info_ptr == NULL) {
+		// TODO: sandbox function call
 		png_destroy_read_struct(&png_ptr, (png_infopp)NULL, 
 		                        (png_infopp)NULL);
 		printf("Cannot png_create_info_struct\n");
@@ -551,12 +571,18 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 	}
 
 	ps.size = size; /* XXX, 4gig limit! */
+	// TODO: do we need to make this a ptr to sandbox memory..?
 	ps.data = mem;
 	ps.seek = 0;
 
+	// TODO: sandbox function call
+	// TODO: register callback?
 	png_set_read_fn(png_ptr, (void *) &ps, ReadData);
 
+	// NOTE: i have no idea what setjmp does
+		// TODO: sandbox inner function call?
 	if (setjmp(png_jmpbuf(png_ptr))) {
+		// TODO: sandbox function call
 		png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
 		if (pixels) MEM_freeN(pixels);
 		if (pixels16) MEM_freeN(pixels16);
@@ -567,17 +593,22 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 
 	// png_set_sig_bytes(png_ptr, 8);
 
+	// TODO: sandbox function calls
 	png_read_info(png_ptr, info_ptr);
+	// TODO: taint color_type (and likely other vars passed by ptr)
 	png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, 
 	             &color_type, NULL, NULL, NULL);
 
+	// TODO: sandbox function call
 	channels = png_get_channels(png_ptr, info_ptr);
 
+	// TODO: verify color_type
 	switch (color_type) {
 		case PNG_COLOR_TYPE_RGB:
 		case PNG_COLOR_TYPE_RGB_ALPHA:
 			break;
 		case PNG_COLOR_TYPE_PALETTE:
+			// TODO: sandbox function calls
 			png_set_palette_to_rgb(png_ptr);
 			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) {
 				channels = 4;
@@ -588,6 +619,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 			break;
 		case PNG_COLOR_TYPE_GRAY:
 		case PNG_COLOR_TYPE_GRAY_ALPHA:
+			// TODO: sandbox function calls
 			if (bit_depth < 8) {
 				png_set_expand(png_ptr);
 				bit_depth = 8;
@@ -598,10 +630,13 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 			}
 			break;
 		default:
+			// NOTE: still no idea what longjmp etc. do
+			// TODO: sandbox inner function call
 			printf("PNG format not supported\n");
 			longjmp(png_jmpbuf(png_ptr), 1);
 	}
-	
+
+	// TODO: untaint/verify width, height, channels(?) 
 	ibuf = IMB_allocImBuf(width, height, 8 * channels, 0);
 
 	if (ibuf) {
@@ -609,10 +644,14 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 		if (bit_depth == 16)
 			ibuf->foptions.flag |= PNG_16BIT;
 
+		// TODO: sandbox function call
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_pHYs)) {
 			int unit_type;
+			// TODO: make tainted
 			png_uint_32 xres, yres;
 
+			// TODO: sandbox function call
+			// TODO: verify tainted data
 			if (png_get_pHYs(png_ptr, info_ptr, &xres, &yres, &unit_type)) {
 				if (unit_type == PNG_RESOLUTION_METER) {
 					ibuf->ppm[0] = xres;
@@ -625,14 +664,18 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 		printf("Couldn't allocate memory for PNG image\n");
 	}
 
+	// 
 	if (ibuf && ((flags & IB_test) == 0)) {
 		if (bit_depth == 16) {
 			imb_addrectfloatImBuf(ibuf);
+			// TODO: sandbox function call
 			png_set_swap(png_ptr);
 
 			pixels16 = imb_alloc_pixels(ibuf->x, ibuf->y, channels, sizeof(png_uint_16), "pixels");
 			if (pixels16 == NULL || ibuf->rect_float == NULL) {
 				printf("Cannot allocate pixels array\n");
+				// NOTE: still no idea what this does
+				// TODO: sandbox inner function call
 				longjmp(png_jmpbuf(png_ptr), 1);
 			}
 
@@ -640,6 +683,8 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 			row_pointers = (png_bytepp) MEM_mallocN((size_t)ibuf->y * sizeof(png_uint_16p), "row_pointers");
 			if (row_pointers == NULL) {
 				printf("Cannot allocate row-pointers array\n");
+				// NOTE: still no idea what this does
+				// TODO: sandbox inner function call
 				longjmp(png_jmpbuf(png_ptr), 1);
 			}
 
@@ -649,6 +694,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 				                                ((png_uint_16 *)pixels16 + (i * ibuf->x) * channels);
 			}
 
+			// TODO: sandbox function call
 			png_read_image(png_ptr, row_pointers);
 
 			/* copy image data */
@@ -697,6 +743,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 			pixels = imb_alloc_pixels(ibuf->x, ibuf->y, channels, sizeof(unsigned char), "pixels");
 			if (pixels == NULL || ibuf->rect == NULL) {
 				printf("Cannot allocate pixels array\n");
+				// TODO: whatever this is
 				longjmp(png_jmpbuf(png_ptr), 1);
 			}
 
@@ -704,6 +751,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 			row_pointers = (png_bytepp) MEM_mallocN((size_t)ibuf->y * sizeof(png_bytep), "row_pointers");
 			if (row_pointers == NULL) {
 				printf("Cannot allocate row-pointers array\n");
+				// TODO: whatever this is
 				longjmp(png_jmpbuf(png_ptr), 1);
 			}
 
@@ -713,6 +761,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 				                                ((unsigned char *)pixels + (((size_t)i) * ibuf->x) * channels * sizeof(unsigned char));
 			}
 
+			// TODO: sandbox inner function call
 			png_read_image(png_ptr, row_pointers);
 
 			/* copy image data */
@@ -758,6 +807,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 
 		if (flags & IB_metadata) {
 			png_text *text_chunks;
+			// TODO: sandbox function call
 			int count = png_get_text(png_ptr, info_ptr, &text_chunks, NULL);
 			for (int i = 0; i < count; i++) {
 				IMB_metadata_add_field(ibuf, text_chunks[i].key, text_chunks[i].text);
@@ -765,6 +815,7 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 			}
 		}
 
+		// TODO: sandbox function call
 		png_read_end(png_ptr, info_ptr);
 	}
 
@@ -775,6 +826,8 @@ ImBuf *imb_loadpng(const unsigned char *mem, size_t size, int flags, char colors
 		MEM_freeN(pixels16);
 	if (row_pointers)
 		MEM_freeN(row_pointers);
+
+	// TODO: sandbox function call
 	png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
 
 	return(ibuf);

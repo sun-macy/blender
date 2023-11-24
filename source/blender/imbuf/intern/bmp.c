@@ -41,6 +41,22 @@
 #include "IMB_colormanagement.h"
 #include "IMB_colormanagement_intern.h"
 
+// ADJ: include rlbox files
+
+// We're going to use RLBox in a single-threaded environment.
+#define RLBOX_SINGLE_THREADED_INVOCATIONS
+// All calls into the sandbox are resolved statically.
+#define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
+
+#include <rlbox.hpp>
+#include <rlbox_noop_sandbox.hpp>
+
+using namespace std;
+using namespace rlbox;
+
+// Define base type for mylib using the noop sandbox
+RLBOX_DEFINE_BASE_TYPES_FOR(bmp, noop);
+
 /* some code copied from article on microsoft.com, copied
  * here for enhanced BMP support in the future
  * http://www.microsoft.com/msj/defaultframe.asp?page=/msj/0197/mfcp1/mfcp1.htm&nav=/msj/0197/newnav.htm
@@ -88,7 +104,9 @@ static int checkbmp(const unsigned char *mem)
 	BMPINFOHEADER bmi;
 	unsigned int u;
 
+	// fine
 	if (mem) {
+		// TODO: sandbox function call
 		if (CHECK_HEADER_FIELD_BMP(mem)) {
 			/* skip fileheader */
 			mem += BMP_FILEHEADER_SIZE;
@@ -115,6 +133,43 @@ static int checkbmp(const unsigned char *mem)
 	return(ret_val);
 }
 
+// changed parameters to accept sandbox. don't need mem anymore.
+	// TODO: rework function to work off of sandbox instead of mem
+static int checkbmp(rlbox_sandbox_bmp sandbox)
+{
+
+	int ret_val = 0;
+	BMPINFOHEADER bmi;
+	unsigned int u;
+
+	// if (mem) {
+		// TODO: sandbox function call
+		if (CHECK_HEADER_FIELD_BMP(mem)) {
+			/* skip fileheader */
+			mem += BMP_FILEHEADER_SIZE;
+		}
+		else {
+			return 0;
+		}
+
+		/* for systems where an int needs to be 4 bytes aligned */
+		memcpy(&bmi, mem, sizeof(bmi));
+
+		u = LITTLE_LONG(bmi.biSize);
+		/* we only support uncompressed images for now. */
+		if (u >= sizeof(BMPINFOHEADER)) {
+			if (bmi.biCompression == 0) {
+				u = LITTLE_SHORT(bmi.biBitCount);
+				if (u > 0 && u <= 32) {
+					ret_val = 1;
+				}
+			}
+		}
+	// }
+
+	return(ret_val);
+}
+
 int imb_is_a_bmp(const unsigned char *buf)
 {
 	return checkbmp(buf);
@@ -130,14 +185,31 @@ struct ImBuf *imb_bmp_decode(const unsigned char *mem, size_t size, int flags, c
 	unsigned short col;
 	double xppm, yppm;
 	bool top_to_bottom = false;
-	
-	(void)size; /* unused */
 
-	if (checkbmp(mem) == 0) return(NULL);
+	// ADJ: Declare and instantiate a new sandbox
+	rlbox_sandbox_bmp sandbox;
+	sandbox.create_sandbox();
 
+	// ADJ: moved null check here before mem gets put into sandbox
+	if(!mem) return(NULL);
+
+	// ADJ: send mem into sandbox
+	// (void)size; /* unused */
+	Tainted<unsigned char*, unsigned char> taint_mem = sandbox.malloc_in_sandbox(size);
+	sandbox.memcpy(taint_mem, mem, size);
+
+	// ADJ: made new fn, sent sandbox into function call
+	if (checkbmp(sandbox) == 0) return(NULL);
+
+	// NOTE: not sure what this does
 	colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
-	bmp = mem + LITTLE_LONG(*(int *)(mem + 10));
+	// ADJ: get pointer to tainted bmp table
+		// NOTE: i dont think the (int*) cast works on taint_mem like this .....
+	Tainted<unsigned char*, unsigned char> *taint_bmp = taint_mem + LITTLE_LONG(*(int *)(taint_mem + 10));
+
+	// some kind of pointer?
+	// bmp = mem + LITTLE_LONG(*(int *)(mem + 10));
 
 	if (CHECK_HEADER_FIELD_BMP(mem)) {
 		/* skip fileheader */
@@ -147,9 +219,10 @@ struct ImBuf *imb_bmp_decode(const unsigned char *mem, size_t size, int flags, c
 		return NULL;
 	}
 
+	// TODO: i guess taint the below data? not sure 
 	/* for systems where an int needs to be 4 bytes aligned */
 	memcpy(&bmi, mem, sizeof(bmi));
-
+	// TODO: add verification?
 	skip = LITTLE_LONG(bmi.biSize);
 	x = LITTLE_LONG(bmi.biWidth);
 	y = LITTLE_LONG(bmi.biHeight);
@@ -180,6 +253,8 @@ struct ImBuf *imb_bmp_decode(const unsigned char *mem, size_t size, int flags, c
 	else {
 		ibuf = IMB_allocImBuf(x, y, ibuf_depth, IB_rect);
 		if (!ibuf) {
+			// ADJ: destroy sandbox
+			sandbox.destroy_sandbox();
 			return NULL;
 		}
 
@@ -278,6 +353,8 @@ struct ImBuf *imb_bmp_decode(const unsigned char *mem, size_t size, int flags, c
 		ibuf->ftype = IMB_FTYPE_BMP;
 	}
 	
+	// ADJ: destroy sandbox
+	sandbox.destroy_sandbox();
 	return(ibuf);
 }
 
