@@ -29,8 +29,13 @@
 
 #include "MEM_guardedalloc.h"
 
+// TODO: add rlbox imports
+// TODO: add other misc. rlbox define statements, etc.
+
+
 bool imb_is_a_webp(const uchar *buf, size_t size)
 {
+  // TODO: sandbox call
   if (WebPGetInfo(buf, size, nullptr, nullptr)) {
     return true;
   }
@@ -43,11 +48,16 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
     return nullptr;
   }
 
+  // TODO: create sandbox
+
   colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
+  // TODO: taint this?
   WebPBitstreamFeatures features;
+  // TODO: sandbox call
   if (WebPGetFeatures(mem, size, &features) != VP8_STATUS_OK) {
     fprintf(stderr, "WebP: Failed to parse features\n");
+    // TODO: destroy sandbox
     return nullptr;
   }
 
@@ -56,6 +66,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
 
   if (ibuf == nullptr) {
     fprintf(stderr, "WebP: Failed to allocate image memory\n");
+    // TODO: destroy sandbox
     return nullptr;
   }
 
@@ -64,6 +75,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
     imb_addrectImBuf(ibuf);
     /* Flip the image during decoding to match Blender. */
     uchar *last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
+    // TODO: sandbox call
     if (WebPDecodeRGBAInto(mem, size, last_row, size_t(ibuf->x) * ibuf->y * 4, -4 * ibuf->x) ==
         nullptr)
     {
@@ -71,6 +83,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
     }
   }
 
+  // TODO: destroy sandbox
   return ibuf;
 }
 
@@ -98,7 +111,11 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
 
   const uchar *data = static_cast<const uchar *>(BLI_mmap_get_pointer(mmap_file));
 
+  // TODO: create sandbox
+
+  // TODO: taint this?
   WebPDecoderConfig config;
+  // TODO: sandbox call
   if (!data || !WebPInitDecoderConfig(&config) ||
       WebPGetFeatures(data, data_size, &config.input) != VP8_STATUS_OK)
   {
@@ -106,6 +123,7 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
+    // TODO: destroy sandbox
     return nullptr;
   }
 
@@ -124,6 +142,7 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
+    // TODO: destroy sandbox
     return nullptr;
   }
 
@@ -140,21 +159,25 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   config.output.u.RGBA.stride = 4 * ibuf->x;
   config.output.u.RGBA.size = size_t(config.output.u.RGBA.stride * ibuf->y);
 
+  // TODO: sandbox call
   if (WebPDecode(data, data_size, &config) != VP8_STATUS_OK) {
     fprintf(stderr, "WebP: Failed to decode image\n");
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
+    // TODO: destroy sandbox
     return nullptr;
   }
 
   /* Free the output buffer. */
+  // TODO: sandbox call
   WebPFreeDecBuffer(&config.output);
 
   imb_mmap_lock();
   BLI_mmap_free(mmap_file);
   imb_mmap_unlock();
 
+  // TODO: destroy sandbox
   return ibuf;
 }
 
@@ -164,6 +187,7 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
   uchar *encoded_data, *last_row;
   size_t encoded_data_size;
 
+  // TODO: create sandbox
   if (bytesperpixel == 3) {
     /* We must convert the ImBuf RGBA buffer to RGB as WebP expects a RGB buffer. */
     const size_t num_pixels = ibuf->x * ibuf->y;
@@ -179,10 +203,12 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
     last_row = (uchar *)(rgb_rect + (ibuf->y - 1) * ibuf->x * 3);
 
     if (ibuf->foptions.quality == 100.0f) {
+      // TODO: sandbox call
       encoded_data_size = WebPEncodeLosslessRGB(
           last_row, ibuf->x, ibuf->y, -3 * ibuf->x, &encoded_data);
     }
     else {
+      // TODO: sandbox call
       encoded_data_size = WebPEncodeRGB(
           last_row, ibuf->x, ibuf->y, -3 * ibuf->x, ibuf->foptions.quality, &encoded_data);
     }
@@ -192,10 +218,12 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
     last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
 
     if (ibuf->foptions.quality == 100.0f) {
+      // TODO: sandbox call
       encoded_data_size = WebPEncodeLosslessRGBA(
           last_row, ibuf->x, ibuf->y, -4 * ibuf->x, &encoded_data);
     }
     else {
+      // TODO: sandbox call
       encoded_data_size = WebPEncodeRGBA(
           last_row, ibuf->x, ibuf->y, -4 * ibuf->x, ibuf->foptions.quality, &encoded_data);
     }
@@ -203,6 +231,7 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
   else {
     fprintf(
         stderr, "WebP: Unsupported bytes per pixel: %d for file: '%s'\n", bytesperpixel, filepath);
+    // TODO: destroy sandbox
     return false;
   }
 
@@ -218,5 +247,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
     fclose(fp);
   }
 
+  // TODO: destroy sandbox
   return true;
 }
