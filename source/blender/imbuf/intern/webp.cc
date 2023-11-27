@@ -29,9 +29,32 @@
 
 #include "MEM_guardedalloc.h"
 
-// TODO: add rlbox imports
-// TODO: add other misc. rlbox define statements, etc.
+// ADJ: add rlbox imports
+#include "rlbox.hpp"
+#include "rlbox_noop_sandbox.hpp"
 
+// TODO: add other misc. rlbox define statements, etc.
+#define RLBOX_SINGLE_THREADED_INVOCATIONS
+#define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
+
+using sandbox_type_t = rlbox::rlbox_noop_sandbox;
+
+using namespace rlbox;
+
+template<typename T>
+using tainted_img = rlbox::tainted<T, sandbox_type_t>;
+
+// TODO: decide if any structs must be loaded and set this up as below.
+    // Define and load any structs needed by the application
+    // #define sandbox_fields_reflection_exampleapp_class_ImageHeader(f, g, ...)  \
+    //   f(unsigned int, status_code, FIELD_NORMAL, ##__VA_ARGS__) g()            \
+    //   f(unsigned int, width, FIELD_NORMAL, ##__VA_ARGS__) g()                  \
+    //   f(unsigned int, height, FIELD_NORMAL, ##__VA_ARGS__) g()
+
+    // #define sandbox_fields_reflection_exampleapp_allClasses(f, ...)            \
+    //   f(ImageHeader, exampleapp, ##__VA_ARGS__)
+
+    // rlbox_load_structs_from_library(exampleapp);
 
 bool imb_is_a_webp(const uchar *buf, size_t size)
 {
