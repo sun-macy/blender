@@ -142,8 +142,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
                                         tainted_mem, size, tainted_last_row, 
                                         size_t(ibuf->x) * ibuf->y * 4, -4 * ibuf->x);
 
-    if(decode_rgba_into.unverified_safe_because("worst case is an error message") == nullptr)
-    {
+    if (decode_rgba_into.unverified_safe_because("worst case is an error message") == nullptr) {
       fprintf(stderr, "WebP: Failed to decode image\n");
     }
 
@@ -264,9 +263,17 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
 {
   const int bytesperpixel = (ibuf->planes + 7) >> 3;
   uchar *encoded_data, *last_row;
-  size_t encoded_data_size;
 
-  // TODO: create sandbox
+  // ADJ: created sandbox
+  rlbox_sandbox<sandbox_type_t> sandbox;
+  sandbox.create_sandbox();
+
+  // ADJ: passed necessary data into the sandbox
+  tainted_img<size_t> encoded_data_size;
+
+  auto tainted_data = sandbox.malloc_in_sandbox<uchar>(encoded_data_size);
+  rlbox::memcpy(sandbox, tainted_data, encoded_data, encoded_data_size);
+
   if (bytesperpixel == 3) {
     /* We must convert the ImBuf RGBA buffer to RGB as WebP expects a RGB buffer. */
     const size_t num_pixels = ibuf->x * ibuf->y;
@@ -281,40 +288,106 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
 
     last_row = (uchar *)(rgb_rect + (ibuf->y - 1) * ibuf->x * 3);
 
+    auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
+    rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
+
     if (ibuf->foptions.quality == 100.0f) {
-      // TODO: sandbox call
-      encoded_data_size = WebPEncodeLosslessRGB(
-          last_row, ibuf->x, ibuf->y, -3 * ibuf->x, &encoded_data);
+      // NOTE:
+      // last_row is a uchar pointer - taint this
+      // ibuf->x and ibuf->y are ints
+      // -3 * ibuf->x is still an int
+      // &encoded_data is the address of encoded_data - taint this
+      // ibuf->foptions.quality is a char
+      // for verifying encoded data size, max size of a webp file is pow(2,32) - 10 bytes according
+      // to webp convention
+
+      // ADJ: sandboxed WebPEncodeLosslessRGB call
+      encoded_data_size = sandbox_invoke(sandbox,
+                                         WebPEncodeLosslessRGB,
+                                         tainted_last_row,
+                                         ibuf->x,
+                                         ibuf->y,
+                                         -3 * ibuf->x,
+                                         &tainted_data)
+                              .copy_and_verify([](unsigned ret) {
+                                printf("Encoding Lossless RGB... encoded data size = %d\n", ret);
+                                return ret <= pow(2, 32) - 10;
+                              });
+      ;
     }
     else {
-      // TODO: sandbox call
-      encoded_data_size = WebPEncodeRGB(
-          last_row, ibuf->x, ibuf->y, -3 * ibuf->x, ibuf->foptions.quality, &encoded_data);
+      // ADJ: sandboxed WebPEncodeRGB call
+      encoded_data_size = sandbox_invoke(sandbox,
+                                         WebPEncodeRGB,
+                                         tainted_last_row,
+                                         ibuf->x,
+                                         ibuf->y,
+                                         -3 * ibuf->x,
+                                         ibuf->foptions.quality,
+                                         &tainted_data)
+                              .copy_and_verify([](unsigned ret) {
+                                printf("Encoding Lossy RGB... encoded data size = %d\n", ret);
+                                return ret <= pow(2, 32) - 10;
+                              });
+      ;
     }
     MEM_freeN(rgb_rect);
   }
   else if (bytesperpixel == 4) {
     last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
 
+    auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
+    rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
+
     if (ibuf->foptions.quality == 100.0f) {
-      // TODO: sandbox call
-      encoded_data_size = WebPEncodeLosslessRGBA(
-          last_row, ibuf->x, ibuf->y, -4 * ibuf->x, &encoded_data);
+      // ADJ: sandboxed WebPEncodeLosslessRGBA call
+      encoded_data_size = sandbox_invoke(sandbox,
+                                         WebPEncodeLosslessRGBA,
+                                         tainted_last_row,
+                                         ibuf->x,
+                                         ibuf->y,
+                                         -4 * ibuf->x,
+                                         &tainted_data)
+                              .copy_and_verify([](unsigned ret) {
+                                printf("Encoding Lossless RGBA... encoded data size = %d\n", ret);
+                                return ret <= pow(2, 32) - 10;
+                              });
+      ;
     }
     else {
-      // TODO: sandbox call
-      encoded_data_size = WebPEncodeRGBA(
-          last_row, ibuf->x, ibuf->y, -4 * ibuf->x, ibuf->foptions.quality, &encoded_data);
+      // ADJ: sandboxed WebPEncodeRGBA call
+      encoded_data_size = sandbox_invoke(sandbox,
+                                         WebPEncodeRGBA,
+                                         tainted_last_row,
+                                         ibuf->x,
+                                         ibuf->y,
+                                         -4 * ibuf->x,
+                                         ibuf->foptions.quality,
+                                         &tainted_data)
+                              .copy_and_verify([](unsigned ret) {
+                                printf("Encoding Lossy RGB... encoded data size = %d\n", ret);
+                                return ret <= pow(2, 32) - 10;
+                              });
+      ;
     }
   }
   else {
     fprintf(
         stderr, "WebP: Unsupported bytes per pixel: %d for file: '%s'\n", bytesperpixel, filepath);
-    // TODO: destroy sandbox
+    // ADJ: destroy sandbox, free tainted data
+    sandbox.free_in_sandbox(tainted_data);
+    sandbox.free_in_sandbox(tainted_last_row)
+    sandbox.destroy_sandbox();
     return false;
   }
 
-  if (encoded_data != nullptr) {
+  // ADJ: verify and free tainted types
+  memcpy(encoded_data, tainted_data.unverified_safe_because("attacker cannot write beyond the encoded data size"), encoded_data_size)
+  sandbox.free_in_sandbox(tainted_data);
+  sandbox.free_in_sandbox(tainted_last_row)
+
+  if (encoded_data != nullptr)
+  {
     FILE *fp = BLI_fopen(filepath, "wb");
     if (!fp) {
       free(encoded_data);
@@ -322,10 +395,11 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
       return false;
     }
     fwrite(encoded_data, encoded_data_size, 1, fp);
-    free(encoded_data);
+    free(encoded_data)
     fclose(fp);
   }
 
-  // TODO: destroy sandbox
+  // ADJ: destroy sandbox
+  sandbox.destroy_sandbox();
   return true;
 }
