@@ -47,22 +47,87 @@ using namespace rlbox;
 
 // ADJ: define tainted type
 template<typename T>
-using tainted_img = rlbox::tainted<T, sandbox_type_t>;
+using tainted_webp = rlbox::tainted<T, sandbox_type_t>;
 
 // NOTE: copied from example code. not sure what this does?
 #define release_assert(cond, msg) if (!(cond)) { fputs(msg, stderr); abort(); }
 
-// TODO: decide if any structs must be loaded and set this up as shown below.
-    // Define and load any structs needed by the application
-    // #define sandbox_fields_reflection_exampleapp_class_ImageHeader(f, g, ...)  \
-    //   f(unsigned int, status_code, FIELD_NORMAL, ##__VA_ARGS__) g()            \
-    //   f(unsigned int, width, FIELD_NORMAL, ##__VA_ARGS__) g()                  \
-    //   f(unsigned int, height, FIELD_NORMAL, ##__VA_ARGS__) g()
+// ADJ: struct representation (with janky workaround for unions...?)
 
-    // #define sandbox_fields_reflection_exampleapp_allClasses(f, ...)            \
-    //   f(ImageHeader, exampleapp, ##__VA_ARGS__)
+  // NOTE: WebPDecoderConfig
 
-    // rlbox_load_structs_from_library(exampleapp);
+#define sandbox_fields_reflection_webp_class_WebPRGBABuffer(f, g, ...)  \
+  f(uint8_t*, rgba, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(size_t, size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+
+#define sandbox_fields_reflection_webp_class_WebPYUVABuffer(f, g, ...)  \
+  f(uint8_t*, y, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint8_t*, u, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint8_t*, v, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint8_t*, a, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, y_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, u_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, v_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, a_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(size_t, y_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(size_t, u_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(size_t, v_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(size_t, a_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+
+#define sandbox_fields_reflection_webp_class_WebPBitstreamFeatures(f, g, ...)  \
+  f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, has_alpha, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, has_animation, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, format, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint32_t[5], pad, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+
+#define sandbox_fields_reflection_webp_class_WebPRGBAorYUVABuffer(f, g, ...)  \
+  f(WebPRGBABuffer, RGBA, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(WebPYUVABuffer, YUVA, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+
+#define sandbox_fields_reflection_webp_class_WebPDecBuffer(f, g, ...)  \
+  f(WEBP_CSP_MODE, colorspace, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, is_external_memory, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(WebPRGBAorYUVABuffer, u, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint32_t[4], pad, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint8_t*, private_memory, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+
+#define sandbox_fields_reflection_webp_class_WebPDecoderOptions(f, g, ...)  \
+  f(int, bypass_filtering, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, no_fancy_upsampling, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, use_cropping, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, crop_left, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, crop_top, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, crop_width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, crop_height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, use_scaling, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, scaled_width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, scaled_height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, use_threads, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, dithering_strength, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, flip, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(int, alpha_dithering_strength, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(uint32_t[5], pad, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+
+#define sandbox_fields_reflection_webp_class_WebPDecoderConfig(f, g, ...)  \
+  f(WebPBitstreamFeatures, input, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+  f(WebPDecBuffer, output, FIELD_NORMAL, ##__VA_ARGS__) g()                \
+  f(WebPDecoderOptions, options, FIELD_NORMAL, ##__VA_ARGS__) g()          \
+
+#define sandbox_fields_reflection_webp_allClasses(f, ...)            \
+  f(WebPRGBABuffer, webp, ##__VA_ARGS__) \
+  f(WebPYUVABuffer, webp, ##__VA_ARGS__) \
+  f(WebPBitstreamFeatures, webp, ##__VA_ARGS__) \
+  f(WebPRGBAorYUVABuffer, webp, ##__VA_ARGS__) \
+  f(WebPDecBuffer, webp, ##__VA_ARGS__) \
+  f(WebPDecoderOptions, webp, ##__VA_ARGS__) \
+  f(WebPDecoderConfig, webp, ##__VA_ARGS__) \
+
+rlbox_load_structs_from_library(webp);
 
 // NOTE: inlined this code below so we don't have to figure out parameter types for now
 bool imb_is_a_webp(const uchar *buf, size_t size)
@@ -86,9 +151,9 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
   //rlbox::memcpy(sandbox, tainted_size, size, sizeof(size_t));
 
   // ADJ: sandboxed WebPGetInfo call
-  tainted_img<bool> buf_is_a_webp = sandbox_invoke(sandbox, WebPGetInfo, tainted_mem, 
+  tainted_webp<bool> buf_is_a_webp = sandbox_invoke(sandbox, WebPGetInfo, tainted_mem, 
                                                     size, nullptr, nullptr);
-  if (!buf_is_a_webp.unverified_safe_because("worst case is early exit")) {
+  if ((!buf_is_a_webp).unverified_safe_because("worst case is early exit")) {
     // ADJ: if buf is not a webp, free all memory and destroy sandbox
     sandbox.free_in_sandbox(tainted_mem);
     //sandbox.free_in_sandbox(tainted_size);
@@ -99,12 +164,11 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
   colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
   // ADJ: tainted this variable
-  tainted_img<WebPBitstreamFeatures> tainted_features;
+  tainted_webp<WebPBitstreamFeatures> tainted_features;
   // ADJ: sandboxed WebPGetFeatures call
-  tainted_img<bool> can_parse_features = sandbox_invoke(sandbox, WebPGetFeatures, tainted_mem, 
+  tainted_webp<bool> can_parse_features = sandbox_invoke(sandbox, WebPGetFeatures, tainted_mem, 
                                                         size, &tainted_features);
-  if (can_parse_features.unverified_safe_because("worst case is early exit") 
-        != VP8_STATUS_OK) {
+  if ((can_parse_features != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) {
     fprintf(stderr, "WebP: Failed to parse features\n");
     // ADJ: if we can't parse features, free all memory and destroy sandbox
     sandbox.free_in_sandbox(tainted_mem);
@@ -142,7 +206,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
                                         tainted_mem, size, tainted_last_row, 
                                         size_t(ibuf->x) * ibuf->y * 4, -4 * ibuf->x);
 
-    if(decode_rgba_into.unverified_safe_because("worst case is an error message") == nullptr)
+    if((decode_rgba_into == nullptr).unverified_safe_because("worst case is an error message"))
     {
       fprintf(stderr, "WebP: Failed to decode image\n");
     }
@@ -182,6 +246,14 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
 
   const uchar *data = static_cast<const uchar *>(BLI_mmap_get_pointer(mmap_file));
 
+  if (!data) {
+    fprintf(stderr, "WebP: Invalid file\n");
+    imb_mmap_lock();
+    BLI_mmap_free(mmap_file);
+    imb_mmap_unlock();
+    return nullptr;
+  }
+
   // ADJ: created sandbox
   rlbox_sandbox<sandbox_type_t> sandbox;
   sandbox.create_sandbox();
@@ -191,28 +263,33 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   rlbox::memcpy(sandbox, tainted_data, data, data_size);
 
   // ADJ: tainted result
-  tainted_img<WebPDecoderConfig> tainted_config;
-  // TODO: sandbox call
-  tainted_img<bool> can_obtain_config = sandbox_invoke(sandbox, WebPInitDecoderConfig, &tainted_config);
-  tainted_img<bool> can_get_features = sandbox_invoke(sandbox, WebPGetFeatures, [data], data_size, &tainted_config.input)
-  if (!data || !WebPInitDecoderConfig(&config) ||
-      WebPGetFeatures(data, data_size, &config.input) != VP8_STATUS_OK)
+  // tainted_webp<WebPDecoderConfig> tainted_config;
+  auto tainted_config = sandbox.malloc_in_sandbox<WebPDecoderConfig>(sizeof(WebPDecoderConfig));
+  // ADJ: sandboxed calls
+  tainted_webp<bool> can_obtain_config = sandbox_invoke(sandbox, WebPInitDecoderConfig, &tainted_config);
+  tainted_webp<bool> can_get_features = sandbox_invoke(sandbox, WebPGetFeatures, tainted_data, data_size, &tainted_config.input);
+  if ((!can_obtain_config).unverified_safe_because("worst case is early exit") 
+        || (can_get_features != VP8_STATUS_OK).unverified_safe_because("worst case is early exit"))
   {
     fprintf(stderr, "WebP: Invalid file\n");
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
-    // TODO: destroy sandbox
+    // ADJ: destroyed sandbox, freed memory
+    sandbox.free_in_sandbox(tainted_data);
+    sandbox.free_in_sandbox(tainted_config);
+    sandbox.destroy_sandbox();
     return nullptr;
   }
 
   /* Return full size of the image. */
-  *r_width = size_t(config.input.width);
-  *r_height = size_t(config.input.height);
+  // ADJ: verify config.input.width and config.input.height before allowing assignment
+  *r_width = size_t((tainted_config.input.width).unverified_safe_because("any width is fine"));
+  *r_height = size_t((tainted_config.input.height).unverified_safe_because("any height is fine"));
 
-  const float scale = float(max_thumb_size) / MAX2(config.input.width, config.input.height);
-  const int dest_w = MAX2(int(config.input.width * scale), 1);
-  const int dest_h = MAX2(int(config.input.height * scale), 1);
+  const float scale = float(max_thumb_size) / MAX2(*r_width, *r_height);
+  const int dest_w = MAX2(int(*r_width * scale), 1);
+  const int dest_h = MAX2(int(*r_height * scale), 1);
 
   colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
   struct ImBuf *ibuf = IMB_allocImBuf(dest_w, dest_h, 32, IB_rect);
@@ -221,42 +298,53 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
-    // TODO: destroy sandbox
+    // ADJ: destroyed sandbox, freed memory
+    sandbox.free_in_sandbox(tainted_data);
+    sandbox.free_in_sandbox(tainted_config);
+    sandbox.destroy_sandbox();
     return nullptr;
   }
 
-  config.options.no_fancy_upsampling = 1;
-  config.options.use_scaling = 1;
-  config.options.scaled_width = dest_w;
-  config.options.scaled_height = dest_h;
-  config.options.bypass_filtering = 1;
-  config.options.use_threads = 0;
-  config.options.flip = 1;
-  config.output.is_external_memory = 1;
-  config.output.colorspace = MODE_RGBA;
-  config.output.u.RGBA.rgba = (uint8_t *)ibuf->rect;
-  config.output.u.RGBA.stride = 4 * ibuf->x;
-  config.output.u.RGBA.size = size_t(config.output.u.RGBA.stride * ibuf->y);
+  // ADJ: modify tainted config (i assume write-only is fine???)
+  tainted_config.options.no_fancy_upsampling = 1;
+  tainted_config.options.use_scaling = 1;
+  tainted_config.options.scaled_width = dest_w;
+  tainted_config.options.scaled_height = dest_h;
+  tainted_config.options.bypass_filtering = 1;
+  tainted_config.options.use_threads = 0;
+  tainted_config.options.flip = 1;
+  tainted_config.output.is_external_memory = 1;
+  tainted_config.output.colorspace = MODE_RGBA;
+  tainted_config.output.u.RGBA.rgba = (uint8_t *)ibuf->rect;
+  tainted_config.output.u.RGBA.stride = 4 * ibuf->x;
+  tainted_config.output.u.RGBA.size = size_t(config.output.u.RGBA.stride * ibuf->y);
 
-  // TODO: sandbox call
-  if (WebPDecode(data, data_size, &config) != VP8_STATUS_OK) {
+  // ADJ: sandboxed call
+  tainted_webp<bool> decode_is_okay = sandbox_invoke(sandbox, WebPDecode, tainted_data, data_size, &tainted_config);
+  if ((decode_is_okay != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) {
     fprintf(stderr, "WebP: Failed to decode image\n");
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
-    // TODO: destroy sandbox
+    // ADJ: destroyed sandbox, freed memory
+    sandbox.free_in_sandbox(tainted_data);
+    sandbox.free_in_sandbox(tainted_config);
+    sandbox.destroy_sandbox();
     return nullptr;
   }
 
   /* Free the output buffer. */
-  // TODO: sandbox call
-  WebPFreeDecBuffer(&config.output);
+  // ADJ: sandboxed call
+  sandbox_invoke(sandbox, WebPFreeDecBuffer, &tainted_config.output);
 
   imb_mmap_lock();
   BLI_mmap_free(mmap_file);
   imb_mmap_unlock();
 
-  // TODO: destroy sandbox
+  // ADJ: destroyed sandbox, freed memory
+  sandbox.free_in_sandbox(tainted_data);
+  sandbox.free_in_sandbox(tainted_config);
+  sandbox.destroy_sandbox();
   return ibuf;
 }
 
