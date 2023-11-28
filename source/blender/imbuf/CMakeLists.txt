@@ -18,7 +18,7 @@ set(INC_SYS
   ${JPEG_INCLUDE_DIR}
   ${ZLIB_INCLUDE_DIRS}
   ${OPENIMAGEIO_INCLUDE_DIRS}
-  ../../extern/rlbox
+  ../../../extern/rlbox/include
 )
 
 set(SRC
@@ -75,22 +75,22 @@ set(SRC
   ../../../intern/ffmpeg/ffmpeg_compat.h
 
   # Header only library.
-  ../../../extern/rlbox/include/rlbox.hpp
-  ../../../extern/rlbox/include/rlbox_app_pointer.hpp
-  ../../../extern/rlbox/include/rlbox_conversion.hpp
-  ../../../extern/rlbox/include/rlbox_dylib_sandbox.hpp
-  ../../../extern/rlbox/include/rlbox_helpers.hpp
-  ../../../extern/rlbox/include/rlbox_noop_sandbox.hpp
-  ../../../extern/rlbox/include/rlbox_policy_types.hpp
-  ../../../extern/rlbox/include/rlbox_range.hpp
-  ../../../extern/rlbox/include/rlbox_sandbox.hpp
-  ../../../extern/rlbox/include/rlbox_stdlib.hpp
-  ../../../extern/rlbox/include/rlbox_stdlib_polyfill.hpp
-  ../../../extern/rlbox/include/rlbox_struct_support.hpp
-  ../../../extern/rlbox/include/rlbox_type_traits.hpp
-  ../../../extern/rlbox/include/rlbox_types.hpp
-  ../../../extern/rlbox/include/rlbox_unwrap.hpp
-  ../../../extern/rlbox/include/rlbox_wrapper_traits.hpp
+  # ../../../extern/rlbox/include/rlbox.hpp
+  # ../../../extern/rlbox/include/rlbox_app_pointer.hpp
+  # ../../../extern/rlbox/include/rlbox_conversion.hpp
+  # ../../../extern/rlbox/include/rlbox_dylib_sandbox.hpp
+  # ../../../extern/rlbox/include/rlbox_helpers.hpp
+  # ../../../extern/rlbox/include/rlbox_noop_sandbox.hpp
+  # ../../../extern/rlbox/include/rlbox_policy_types.hpp
+  # ../../../extern/rlbox/include/rlbox_range.hpp
+  # ../../../extern/rlbox/include/rlbox_sandbox.hpp
+  # ../../../extern/rlbox/include/rlbox_stdlib.hpp
+  # ../../../extern/rlbox/include/rlbox_stdlib_polyfill.hpp
+  # ../../../extern/rlbox/include/rlbox_struct_support.hpp
+  # ../../../extern/rlbox/include/rlbox_type_traits.hpp
+  # ../../../extern/rlbox/include/rlbox_types.hpp
+  # ../../../extern/rlbox/include/rlbox_unwrap.hpp
+  # ../../../extern/rlbox/include/rlbox_wrapper_traits.hpp
 )
 
 set(LIB
