@@ -30,21 +30,29 @@
 #include "MEM_guardedalloc.h"
 
 // ADJ: add rlbox imports
-#include "rlbox.hpp"
-#include "rlbox_noop_sandbox.hpp"
+#include <rlbox.hpp>
+#include <rlbox_noop_sandbox.hpp>
 
-// TODO: add other misc. rlbox define statements, etc.
+// ADJ: configure rlbox
 #define RLBOX_SINGLE_THREADED_INVOCATIONS
-#define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
 
+// ADJ: configure to use noop sandbox
+  // TODO: change to wasm2c sandbox eventually
+#define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
+RLBOX_DEFINE_BASE_TYPES_FOR(webp, noop);
 using sandbox_type_t = rlbox::rlbox_noop_sandbox;
 
+// NOTE: blender community does not like broad imports like this
 using namespace rlbox;
 
+// ADJ: define tainted type
 template<typename T>
 using tainted_img = rlbox::tainted<T, sandbox_type_t>;
 
-// TODO: decide if any structs must be loaded and set this up as below.
+// NOTE: copied from example code. not sure what this does?
+#define release_assert(cond, msg) if (!(cond)) { fputs(msg, stderr); abort(); }
+
+// TODO: decide if any structs must be loaded and set this up as shown below.
     // Define and load any structs needed by the application
     // #define sandbox_fields_reflection_exampleapp_class_ImageHeader(f, g, ...)  \
     //   f(unsigned int, status_code, FIELD_NORMAL, ##__VA_ARGS__) g()            \
@@ -56,9 +64,9 @@ using tainted_img = rlbox::tainted<T, sandbox_type_t>;
 
     // rlbox_load_structs_from_library(exampleapp);
 
+// NOTE: inlined this code below so we don't have to figure out parameter types for now
 bool imb_is_a_webp(const uchar *buf, size_t size)
 {
-  // TODO: sandbox call
   if (WebPGetInfo(buf, size, nullptr, nullptr)) {
     return true;
   }
@@ -67,20 +75,41 @@ bool imb_is_a_webp(const uchar *buf, size_t size)
 
 ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
 {
-  if (!imb_is_a_webp(mem, size)) {
+  // ADJ: created sandbox
+  rlbox_sandbox<sandbox_type_t> sandbox;
+  sandbox.create_sandbox();
+
+  // ADJ: passed necessary parameters into the sandbox
+  auto tainted_mem = sandbox.malloc_in_sandbox<uchar>(size);
+  rlbox::memcpy(sandbox, tainted_mem, mem, size);
+  //auto tainted_size = sandbox.malloc_in_sandbox<size_t>(sizeof(size_t));
+  //rlbox::memcpy(sandbox, tainted_size, size, sizeof(size_t));
+
+  // ADJ: sandboxed WebPGetInfo call
+  tainted_img<bool> buf_is_a_webp = sandbox_invoke(sandbox, WebPGetInfo, tainted_mem, 
+                                                    size, nullptr, nullptr);
+  if (!buf_is_a_webp.unverified_safe_because("worst case is early exit")) {
+    // ADJ: if buf is not a webp, free all memory and destroy sandbox
+    sandbox.free_in_sandbox(tainted_mem);
+    //sandbox.free_in_sandbox(tainted_size);
+    sandbox.destroy_sandbox();
     return nullptr;
   }
 
-  // TODO: create sandbox
-
   colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
-  // TODO: taint this?
-  WebPBitstreamFeatures features;
-  // TODO: sandbox call
-  if (WebPGetFeatures(mem, size, &features) != VP8_STATUS_OK) {
+  // ADJ: tainted this variable
+  tainted_img<WebPBitstreamFeatures> tainted_features;
+  // ADJ: sandboxed WebPGetFeatures call
+  tainted_img<bool> can_parse_features = sandbox_invoke(sandbox, WebPGetFeatures, tainted_mem, 
+                                                        size, &tainted_features);
+  if (can_parse_features.unverified_safe_because("worst case is early exit") 
+        != VP8_STATUS_OK) {
     fprintf(stderr, "WebP: Failed to parse features\n");
-    // TODO: destroy sandbox
+    // ADJ: if we can't parse features, free all memory and destroy sandbox
+    sandbox.free_in_sandbox(tainted_mem);
+    //sandbox.free_in_sandbox(tainted_size);
+    sandbox.destroy_sandbox();
     return nullptr;
   }
 
@@ -89,24 +118,43 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
 
   if (ibuf == nullptr) {
     fprintf(stderr, "WebP: Failed to allocate image memory\n");
-    // TODO: destroy sandbox
+    // ADJ: if we cannot allocate image memory, free all memory and destroy sandbox
+    sandbox.free_in_sandbox(tainted_mem);
+    //sandbox.free_in_sandbox(tainted_size);
+    sandbox.destroy_sandbox();
     return nullptr;
   }
 
   if ((flags & IB_test) == 0) {
     ibuf->ftype = IMB_FTYPE_WEBP;
     imb_addrectImBuf(ibuf);
+
     /* Flip the image during decoding to match Blender. */
+
+    // ADJ: made tainted copy of last_row for use within sandbox
     uchar *last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
-    // TODO: sandbox call
-    if (WebPDecodeRGBAInto(mem, size, last_row, size_t(ibuf->x) * ibuf->y * 4, -4 * ibuf->x) ==
-        nullptr)
+      // ibuf->x should be the width of the image? see IMB_imbuf_types.h:164.
+    auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
+    rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
+
+    // ADJ: sandboxed WebPDecodeRGBAInto call
+    auto decode_rgba_into = sandbox_invoke(sandbox, WebPDecodeRGBAInto, 
+                                        tainted_mem, size, tainted_last_row, 
+                                        size_t(ibuf->x) * ibuf->y * 4, -4 * ibuf->x);
+
+    if(decode_rgba_into.unverified_safe_because("worst case is an error message") == nullptr)
     {
       fprintf(stderr, "WebP: Failed to decode image\n");
     }
+
+    // ADJ: free sandbox memory before we leave its context
+    sandbox.free_in_sandbox(tainted_last_row);
   }
 
-  // TODO: destroy sandbox
+  // ADJ: free all memory, destroy sandbox
+  sandbox.free_in_sandbox(tainted_mem);
+  //sandbox.free_in_sandbox(tainted_size);
+  sandbox.destroy_sandbox();
   return ibuf;
 }
 
@@ -134,11 +182,19 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
 
   const uchar *data = static_cast<const uchar *>(BLI_mmap_get_pointer(mmap_file));
 
-  // TODO: create sandbox
+  // ADJ: created sandbox
+  rlbox_sandbox<sandbox_type_t> sandbox;
+  sandbox.create_sandbox();
 
-  // TODO: taint this?
-  WebPDecoderConfig config;
+  // ADJ: passed necessary data into the sandbox
+  auto tainted_data = sandbox.malloc_in_sandbox<uchar>(data_size);
+  rlbox::memcpy(sandbox, tainted_data, data, data_size);
+
+  // ADJ: tainted result
+  tainted_img<WebPDecoderConfig> tainted_config;
   // TODO: sandbox call
+  tainted_img<bool> can_obtain_config = sandbox_invoke(sandbox, WebPInitDecoderConfig, &tainted_config);
+  tainted_img<bool> can_get_features = sandbox_invoke(sandbox, WebPGetFeatures, [data], data_size, &tainted_config.input)
   if (!data || !WebPInitDecoderConfig(&config) ||
       WebPGetFeatures(data, data_size, &config.input) != VP8_STATUS_OK)
   {
