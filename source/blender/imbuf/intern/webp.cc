@@ -29,15 +29,12 @@
 
 #include "MEM_guardedalloc.h"
 
-// ADJ: configure rlbox
 #define RLBOX_SINGLE_THREADED_INVOCATIONS
 #define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
 
-// ADJ: add rlbox imports
 #include <rlbox.hpp>
 #include <rlbox_noop_sandbox.hpp>
 
-// ADJ: configure to use noop sandbox
   // TODO: change to wasm2c sandbox eventually
 RLBOX_DEFINE_BASE_TYPES_FOR(webp, noop);
 using sandbox_type_t = rlbox::rlbox_noop_sandbox;
@@ -45,17 +42,13 @@ using sandbox_type_t = rlbox::rlbox_noop_sandbox;
 // NOTE: blender community does not like broad imports like this
 using namespace rlbox;
 
-// ADJ: define tainted type
 template<typename T>
 using tainted_webp = rlbox::tainted<T, sandbox_type_t>;
 
 // NOTE: copied from example code. not sure what this does?
 #define release_assert(cond, msg) if (!(cond)) { fputs(msg, stderr); abort(); }
 
-// ADJ: struct representation (with janky workaround for unions...?)
-
-  // NOTE: WebPDecoderConfig
-
+// NOTE: web structs (with janky union workaround)
 #define sandbox_fields_reflection_webp_class_WebPRGBABuffer(f, g, ...)  \
   f(uint8_t*, rgba, FIELD_NORMAL, ##__VA_ARGS__) g()         \
   f(int, stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
@@ -140,40 +133,28 @@ bool imb_is_a_webp(const uchar *buf, size_t size)
 
 ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
 {
-  // ADJ: created sandbox
   rlbox_sandbox<sandbox_type_t> sandbox;
   sandbox.create_sandbox();
 
-  // ADJ: passed necessary parameters into the sandbox
   auto tainted_mem = sandbox.malloc_in_sandbox<uchar>(size);
   rlbox::memcpy(sandbox, tainted_mem, mem, size);
-  //auto tainted_size = sandbox.malloc_in_sandbox<size_t>(sizeof(size_t));
-  //rlbox::memcpy(sandbox, tainted_size, size, sizeof(size_t));
 
-  // ADJ: sandboxed WebPGetInfo call
   tainted_webp<int> buf_is_a_webp = sandbox_invoke(sandbox, WebPGetInfo, tainted_mem, 
                                                     size, nullptr, nullptr);
   if ((buf_is_a_webp == 0).unverified_safe_because("worst case is early exit")) {
-    // ADJ: if buf is not a webp, free all memory and destroy sandbox
     sandbox.free_in_sandbox(tainted_mem);
-    //sandbox.free_in_sandbox(tainted_size);
     sandbox.destroy_sandbox();
     return nullptr;
   }
 
   colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
-  // ADJ: tainted this variable
   tainted_webp<WebPBitstreamFeatures*> tainted_features;
-  //WebPBitstreamFeatures tainted_features;
-  // ADJ: sandboxed WebPGetFeatures call
   tainted_webp<VP8StatusCode> can_parse_features = sandbox_invoke(sandbox, WebPGetFeatures, tainted_mem, 
                                                         size, tainted_features);
   if ((can_parse_features != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) {
     fprintf(stderr, "WebP: Failed to parse features\n");
-    // ADJ: if we can't parse features, free all memory and destroy sandbox
     sandbox.free_in_sandbox(tainted_mem);
-    //sandbox.free_in_sandbox(tainted_size);
     sandbox.destroy_sandbox();
     return nullptr;
   }
@@ -191,9 +172,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
 
   if (ibuf == nullptr) {
     fprintf(stderr, "WebP: Failed to allocate image memory\n");
-    // ADJ: if we cannot allocate image memory, free all memory and destroy sandbox
     sandbox.free_in_sandbox(tainted_mem);
-    //sandbox.free_in_sandbox(tainted_size);
     sandbox.destroy_sandbox();
     return nullptr;
   }
@@ -204,13 +183,11 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
 
     /* Flip the image during decoding to match Blender. */
 
-    // ADJ: made tainted copy of last_row for use within sandbox
     uchar *last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
-      // ibuf->x should be the width of the image? see IMB_imbuf_types.h:164.
+      // NOTE: ibuf->x should be the width of the image? see IMB_imbuf_types.h:164.
     auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
     rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
 
-    // ADJ: sandboxed WebPDecodeRGBAInto call
     auto tainted_decode_rgba_into = sandbox_invoke(sandbox, WebPDecodeRGBAInto, 
                                         tainted_mem, size, tainted_last_row, 
                                         size_t(ibuf->x) * ibuf->y * 4, -4 * ibuf->x);
@@ -228,13 +205,10 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
       fprintf(stderr, "WebP: Failed to decode image\n");
     }
 
-    // ADJ: free sandbox memory before we leave its context
     sandbox.free_in_sandbox(tainted_last_row);
   }
 
-  // ADJ: free all memory, destroy sandbox
   sandbox.free_in_sandbox(tainted_mem);
-  //sandbox.free_in_sandbox(tainted_size);
   sandbox.destroy_sandbox();
   return ibuf;
 }
@@ -271,17 +245,13 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     return nullptr;
   }
 
-  // ADJ: created sandbox
   rlbox_sandbox<sandbox_type_t> sandbox;
   sandbox.create_sandbox();
 
-  // ADJ: passed necessary data into the sandbox
   auto tainted_data = sandbox.malloc_in_sandbox<uchar>(data_size);
   rlbox::memcpy(sandbox, tainted_data, data, data_size);
 
-  // ADJ: tainted result
   tainted_webp<WebPDecoderConfig*> tainted_config = sandbox.malloc_in_sandbox<WebPDecoderConfig>(sizeof(WebPDecoderConfig));
-  // ADJ: sandboxed calls
   tainted_webp<int> can_obtain_config = sandbox_invoke(sandbox, WebPInitDecoderConfig, tainted_config);
 
   tainted_webp<WebPBitstreamFeatures*> tainted_config_input = sandbox_reinterpret_cast<WebPBitstreamFeatures*>(tainted_config);
@@ -294,7 +264,6 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
-    // ADJ: destroyed sandbox, freed memory
     sandbox.free_in_sandbox(tainted_data);
     sandbox.free_in_sandbox(tainted_config);
     sandbox.destroy_sandbox();
@@ -302,7 +271,6 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   }
 
   /* Return full size of the image. */
-  // ADJ: verify config.input.width and config.input.height before allowing assignment
   *r_width = size_t((tainted_config->input.width).unverified_safe_because("any width is fine"));
   *r_height = size_t((tainted_config->input.height).unverified_safe_because("any height is fine"));
 
@@ -317,14 +285,12 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
-    // ADJ: destroyed sandbox, freed memory
     sandbox.free_in_sandbox(tainted_data);
     sandbox.free_in_sandbox(tainted_config);
     sandbox.destroy_sandbox();
     return nullptr;
   }
 
-  // ADJ: modify tainted config (i assume write-only is fine???)
   tainted_config->options.no_fancy_upsampling = 1;
   tainted_config->options.use_scaling = 1;
   tainted_config->options.scaled_width = dest_w;
@@ -335,7 +301,6 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   tainted_config->output.is_external_memory = 1;
   tainted_config->output.colorspace = MODE_RGBA;
 
-  //tainted_config->output.u.RGBA.rgba = (uint8_t *)ibuf->rect;
   tainted_config->output.u.RGBA.rgba = sandbox.malloc_in_sandbox<uint8_t>(sizeof(uint8_t));
   rlbox::memcpy(sandbox, &(tainted_config->output.u.RGBA.rgba), (uint8_t*) ibuf->rect, sizeof(uint8_t));
 
@@ -346,14 +311,12 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   });
   tainted_config->output.u.RGBA.size = size_t(stride * ibuf->y);
 
-  // ADJ: sandboxed call
   tainted_webp<VP8StatusCode> decode_is_okay = sandbox_invoke(sandbox, WebPDecode, tainted_data, data_size, tainted_config);
   if ((decode_is_okay != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) {
     fprintf(stderr, "WebP: Failed to decode image\n");
     imb_mmap_lock();
     BLI_mmap_free(mmap_file);
     imb_mmap_unlock();
-    // ADJ: destroyed sandbox, freed memory
     sandbox.free_in_sandbox(tainted_data);
     sandbox.free_in_sandbox(tainted_config);
     sandbox.destroy_sandbox();
@@ -361,7 +324,6 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   }
 
   /* Free the output buffer. */
-  // ADJ: sandboxed call
   tainted_webp<WebPDecBuffer*> tainted_config_output = sandbox_reinterpret_cast<WebPDecBuffer*>(sandbox_reinterpret_cast<char*>(tainted_config) + sizeof(WebPBitstreamFeatures));
   sandbox_invoke(sandbox, WebPFreeDecBuffer, tainted_config_output);
 
@@ -369,7 +331,6 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
   BLI_mmap_free(mmap_file);
   imb_mmap_unlock();
 
-  // ADJ: destroyed sandbox, freed memory
   sandbox.free_in_sandbox(tainted_data);
   sandbox.free_in_sandbox(tainted_config);
   sandbox.destroy_sandbox();
@@ -382,12 +343,8 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
   uchar *encoded_data, *last_row;
   size_t encoded_data_size;
 
-  // ADJ: created sandbox
   rlbox_sandbox<sandbox_type_t> sandbox;
   sandbox.create_sandbox();
-
-  // ADJ: passed necessary data into the sandbox
-  // tainted_webp<size_t> encoded_data_size;
 
   tainted_webp<uchar**> tainted_data = sandbox.malloc_in_sandbox<uchar*>(sizeof(uchar*));
 
@@ -418,7 +375,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
       // for verifying encoded data size, max size of a webp file is pow(2,32) - 10 bytes according
       // to webp convention
 
-      // ADJ: sandboxed WebPEncodeLosslessRGB call
       encoded_data_size = sandbox_invoke(sandbox,
                                          WebPEncodeLosslessRGB,
                                          tainted_last_row,
@@ -433,7 +389,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
       ;
     }
     else {
-      // ADJ: sandboxed WebPEncodeRGB call
       encoded_data_size = sandbox_invoke(sandbox,
                                          WebPEncodeRGB,
                                          tainted_last_row,
@@ -458,7 +413,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
     rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
 
     if (ibuf->foptions.quality == 100.0f) {
-      // ADJ: sandboxed WebPEncodeLosslessRGBA call
       encoded_data_size = sandbox_invoke(sandbox,
                                          WebPEncodeLosslessRGBA,
                                          tainted_last_row,
@@ -472,7 +426,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
                               });
     }
     else {
-      // ADJ: sandboxed WebPEncodeRGBA call
       encoded_data_size = sandbox_invoke(sandbox,
                                          WebPEncodeRGBA,
                                          tainted_last_row,
@@ -491,13 +444,10 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
   else {
     fprintf(
         stderr, "WebP: Unsupported bytes per pixel: %d for file: '%s'\n", bytesperpixel, filepath);
-    // ADJ: destroy sandbox, free tainted data
     sandbox.free_in_sandbox(tainted_data);
     sandbox.destroy_sandbox();
     return false;
   }
-
-  // ADJ: verify and free tainted types
 
   std::unique_ptr<unsigned char> wrapped_verified_data_ptr;
 
@@ -517,7 +467,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
     if (!fp) {
       free(encoded_data);
       fprintf(stderr, "WebP: Cannot open file for writing: '%s'\n", filepath);
-      // ADJ: destroy sandbox
       sandbox.destroy_sandbox();
       return false;
     }
@@ -526,7 +475,6 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
     fclose(fp);
   }
 
-  // ADJ: destroy sandbox
   sandbox.destroy_sandbox();
   return true;
 }
