@@ -52,72 +52,72 @@ using tainted_webp = rlbox::tainted<T, sandbox_type_t>;
 #define sandbox_fields_reflection_webp_class_WebPRGBABuffer(f, g, ...)  \
   f(uint8_t*, rgba, FIELD_NORMAL, ##__VA_ARGS__) g()         \
   f(int, stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(size_t, size, FIELD_NORMAL, ##__VA_ARGS__) g()         
+  f(unsigned long, size, FIELD_NORMAL, ##__VA_ARGS__) g()         
 
-#define sandbox_fields_reflection_webp_class_WebPYUVABuffer(f, g, ...)  \
-  f(uint8_t*, y, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(uint8_t*, u, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(uint8_t*, v, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(uint8_t*, a, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, y_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, u_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, v_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, a_stride, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(size_t, y_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(size_t, u_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(size_t, v_size, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(size_t, a_size, FIELD_NORMAL, ##__VA_ARGS__) g()         
+#define sandbox_fields_reflection_webp_class_WebPYUVABuffer(f, g, ...)          \
+  f(uint8_t*, y, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
+  f(uint8_t*, u, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
+  f(uint8_t*, v, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
+  f(uint8_t*, a, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
+  f(int, y_stride, FIELD_NORMAL, ##__VA_ARGS__) g()                             \
+  f(int, u_stride, FIELD_NORMAL, ##__VA_ARGS__) g()                             \
+  f(int, v_stride, FIELD_NORMAL, ##__VA_ARGS__) g()                             \
+  f(int, a_stride, FIELD_NORMAL, ##__VA_ARGS__) g()                             \
+  f(unsigned long, y_size, FIELD_NORMAL, ##__VA_ARGS__) g()                     \
+  f(unsigned long, u_size, FIELD_NORMAL, ##__VA_ARGS__) g()                     \
+  f(unsigned long, v_size, FIELD_NORMAL, ##__VA_ARGS__) g()                     \
+  f(unsigned long, a_size, FIELD_NORMAL, ##__VA_ARGS__) g()         
 
-#define sandbox_fields_reflection_webp_class_WebPBitstreamFeatures(f, g, ...)  \
-  f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, has_alpha, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, has_animation, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, format, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+#define sandbox_fields_reflection_webp_class_WebPBitstreamFeatures(f, g, ...)   \
+  f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()                                \
+  f(int, height, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
+  f(int, has_alpha, FIELD_NORMAL, ##__VA_ARGS__) g()                            \
+  f(int, has_animation, FIELD_NORMAL, ##__VA_ARGS__) g()                        \
+  f(int, format, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
   f(uint32_t[5], pad, FIELD_NORMAL, ##__VA_ARGS__) g()         
 
-#define sandbox_fields_reflection_webp_class_WebPRGBAorYUVABuffer(f, g, ...)  \
-  f(WebPRGBABuffer, RGBA, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+#define sandbox_fields_reflection_webp_class_WebPRGBAorYUVABuffer(f, g, ...)    \
+  f(WebPRGBABuffer, RGBA, FIELD_NORMAL, ##__VA_ARGS__) g()                      \
   f(WebPYUVABuffer, YUVA, FIELD_NORMAL, ##__VA_ARGS__) g()         
 
-#define sandbox_fields_reflection_webp_class_WebPDecBuffer(f, g, ...)  \
-  f(WEBP_CSP_MODE, colorspace, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, is_external_memory, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(WebPRGBAorYUVABuffer, u, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(uint32_t[4], pad, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+#define sandbox_fields_reflection_webp_class_WebPDecBuffer(f, g, ...)           \
+  f(WEBP_CSP_MODE, colorspace, FIELD_NORMAL, ##__VA_ARGS__) g()                 \
+  f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()                                \
+  f(int, height, FIELD_NORMAL, ##__VA_ARGS__) g()                               \
+  f(int, is_external_memory, FIELD_NORMAL, ##__VA_ARGS__) g()                   \
+  f(WebPRGBAorYUVABuffer, u, FIELD_NORMAL, ##__VA_ARGS__) g()                   \
+  f(uint32_t[4], pad, FIELD_NORMAL, ##__VA_ARGS__) g()                          \
   f(uint8_t*, private_memory, FIELD_NORMAL, ##__VA_ARGS__) g()         
 
-#define sandbox_fields_reflection_webp_class_WebPDecoderOptions(f, g, ...)  \
-  f(int, bypass_filtering, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, no_fancy_upsampling, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, use_cropping, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, crop_left, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, crop_top, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, crop_width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, crop_height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, use_scaling, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, scaled_width, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, scaled_height, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, use_threads, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, dithering_strength, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, flip, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(int, alpha_dithering_strength, FIELD_NORMAL, ##__VA_ARGS__) g()         \
+#define sandbox_fields_reflection_webp_class_WebPDecoderOptions(f, g, ...)      \
+  f(int, bypass_filtering, FIELD_NORMAL, ##__VA_ARGS__) g()                     \
+  f(int, no_fancy_upsampling, FIELD_NORMAL, ##__VA_ARGS__) g()                  \
+  f(int, use_cropping, FIELD_NORMAL, ##__VA_ARGS__) g()                         \
+  f(int, crop_left, FIELD_NORMAL, ##__VA_ARGS__) g()                            \
+  f(int, crop_top, FIELD_NORMAL, ##__VA_ARGS__) g()                             \
+  f(int, crop_width, FIELD_NORMAL, ##__VA_ARGS__) g()                           \
+  f(int, crop_height, FIELD_NORMAL, ##__VA_ARGS__) g()                          \
+  f(int, use_scaling, FIELD_NORMAL, ##__VA_ARGS__) g()                          \
+  f(int, scaled_width, FIELD_NORMAL, ##__VA_ARGS__) g()                         \
+  f(int, scaled_height, FIELD_NORMAL, ##__VA_ARGS__) g()                        \
+  f(int, use_threads, FIELD_NORMAL, ##__VA_ARGS__) g()                          \
+  f(int, dithering_strength, FIELD_NORMAL, ##__VA_ARGS__) g()                   \
+  f(int, flip, FIELD_NORMAL, ##__VA_ARGS__) g()                                 \
+  f(int, alpha_dithering_strength, FIELD_NORMAL, ##__VA_ARGS__) g()             \
   f(uint32_t[5], pad, FIELD_NORMAL, ##__VA_ARGS__) g()         
 
-#define sandbox_fields_reflection_webp_class_WebPDecoderConfig(f, g, ...)  \
-  f(WebPBitstreamFeatures, input, FIELD_NORMAL, ##__VA_ARGS__) g()         \
-  f(WebPDecBuffer, output, FIELD_NORMAL, ##__VA_ARGS__) g()                \
+#define sandbox_fields_reflection_webp_class_WebPDecoderConfig(f, g, ...)       \
+  f(WebPBitstreamFeatures, input, FIELD_NORMAL, ##__VA_ARGS__) g()              \
+  f(WebPDecBuffer, output, FIELD_NORMAL, ##__VA_ARGS__) g()                     \
   f(WebPDecoderOptions, options, FIELD_NORMAL, ##__VA_ARGS__) g()          
 
-#define sandbox_fields_reflection_webp_allClasses(f, ...)            \
-  f(WebPRGBABuffer, webp, ##__VA_ARGS__) \
-  f(WebPYUVABuffer, webp, ##__VA_ARGS__) \
-  f(WebPBitstreamFeatures, webp, ##__VA_ARGS__) \
-  f(WebPRGBAorYUVABuffer, webp, ##__VA_ARGS__) \
-  f(WebPDecBuffer, webp, ##__VA_ARGS__) \
-  f(WebPDecoderOptions, webp, ##__VA_ARGS__) \
+#define sandbox_fields_reflection_webp_allClasses(f, ...)                       \
+  f(WebPRGBABuffer, webp, ##__VA_ARGS__)                                        \
+  f(WebPYUVABuffer, webp, ##__VA_ARGS__)                                        \
+  f(WebPBitstreamFeatures, webp, ##__VA_ARGS__)                                 \
+  f(WebPRGBAorYUVABuffer, webp, ##__VA_ARGS__)                                  \
+  f(WebPDecBuffer, webp, ##__VA_ARGS__)                                         \
+  f(WebPDecoderOptions, webp, ##__VA_ARGS__)                                    \
   f(WebPDecoderConfig, webp, ##__VA_ARGS__)
 
 rlbox_load_structs_from_library(webp);
