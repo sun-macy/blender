@@ -362,118 +362,160 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/)
 
     last_row = (uchar *)(rgb_rect + (ibuf->y - 1) * ibuf->x * 3);
 
-    auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
+    webp_tainted<uchar*> tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
     rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
 
-    if (ibuf->foptions.quality == 100.0f) {
-      // NOTE:
-      // last_row is a uchar pointer - taint this
-      // ibuf->x and ibuf->y are ints
-      // -3 * ibuf->x is still an int
-      // &encoded_data is the address of encoded_data - taint this
-      // ibuf->foptions.quality is a char
-      // for verifying encoded data size, max size of a webp file is pow(2,32) - 10 bytes according
-      // to webp convention
-
-      encoded_data_size = sandbox_invoke(sandbox,
-                                         WebPEncodeLosslessRGB,
-                                         tainted_last_row,
-                                         ibuf->x,
-                                         ibuf->y,
-                                         -3 * ibuf->x,
-                                         tainted_data)
-                              .copy_and_verify([](unsigned ret) {
-                                assert(ret <= pow(2, 32) - 10);
-                                return ret;
-                              });
-      ;
-    }
-    else {
-      encoded_data_size = sandbox_invoke(sandbox,
-                                         WebPEncodeRGB,
-                                         tainted_last_row,
-                                         ibuf->x,
-                                         ibuf->y,
-                                         -3 * ibuf->x,
-                                         ibuf->foptions.quality,
-                                         tainted_data)
-                              .copy_and_verify([](unsigned ret) {
-                                assert(ret <= pow(2, 32) - 10);
-                                return ret;
-                              });
-      ;
-    }
-    MEM_freeN(rgb_rect);
-    sandbox.free_in_sandbox(tainted_last_row);
-  }
-  else if (bytesperpixel == 4) {
-    last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
-
-    auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
-    rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
+    last_row = tainted_last_row.UNSAFE_unverified();
 
     if (ibuf->foptions.quality == 100.0f) {
-      encoded_data_size = sandbox_invoke(sandbox,
-                                         WebPEncodeLosslessRGBA,
-                                         tainted_last_row,
-                                         ibuf->x,
-                                         ibuf->y,
-                                         -4 * ibuf->x,
-                                         tainted_data)
-                              .copy_and_verify([](unsigned ret) {
-                                assert(ret <= pow(2, 32) - 10);
-                                return ret;
-                              });
+        encoded_data_size = WebPEncodeLosslessRGB(
+            last_row, ibuf->x, ibuf->y, -3 * ibuf->x, &encoded_data);
+      }
+      else {
+        encoded_data_size = WebPEncodeRGB(
+            last_row, ibuf->x, ibuf->y, -3 * ibuf->x, ibuf->foptions.quality, &encoded_data);
+      }
+      MEM_freeN(rgb_rect);
+    }
+    else if (bytesperpixel == 4) {
+      last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
+
+      if (ibuf->foptions.quality == 100.0f) {
+        encoded_data_size = WebPEncodeLosslessRGBA(
+            last_row, ibuf->x, ibuf->y, -4 * ibuf->x, &encoded_data);
+      }
+      else {
+        encoded_data_size = WebPEncodeRGBA(
+            last_row, ibuf->x, ibuf->y, -4 * ibuf->x, ibuf->foptions.quality, &encoded_data);
+      }
     }
     else {
-      encoded_data_size = sandbox_invoke(sandbox,
-                                         WebPEncodeRGBA,
-                                         tainted_last_row,
-                                         ibuf->x,
-                                         ibuf->y,
-                                         -4 * ibuf->x,
-                                         ibuf->foptions.quality,
-                                         tainted_data)
-                              .copy_and_verify([](unsigned ret) {
-                                //printf("Encoding Lossy RGB... encoded data size = %d\n", ret);
-                                return ret <= pow(2, 32) - 10;
-                              });
-    }
-    sandbox.free_in_sandbox(tainted_last_row);
-  }
-  else {
-    fprintf(
-        stderr, "WebP: Unsupported bytes per pixel: %d for file: '%s'\n", bytesperpixel, filepath);
-    sandbox.free_in_sandbox(tainted_data);
-    sandbox.destroy_sandbox();
-    return false;
-  }
-
-  std::unique_ptr<unsigned char> wrapped_verified_data_ptr;
-
-  wrapped_verified_data_ptr = (*tainted_data).copy_and_verify([] (std::unique_ptr<unsigned char> addr) {
-    assert(addr != nullptr);
-    return addr;
-  });
-
-  uchar* verified_data_ptr = wrapped_verified_data_ptr.get();
-  encoded_data = (uchar*) malloc(encoded_data_size);
-  memcpy(encoded_data, verified_data_ptr, encoded_data_size);
-  sandbox.free_in_sandbox(tainted_data);
-
-  if (encoded_data != nullptr)
-  {
-    FILE *fp = BLI_fopen(filepath, "wb");
-    if (!fp) {
-      free(encoded_data);
-      fprintf(stderr, "WebP: Cannot open file for writing: '%s'\n", filepath);
-      sandbox.destroy_sandbox();
+      fprintf(
+          stderr, "WebP: Unsupported bytes per pixel: %d for file: '%s'\n", bytesperpixel, filepath);
       return false;
     }
-    fwrite(encoded_data, encoded_data_size, 1, fp);
-    free(encoded_data);
-    fclose(fp);
-  }
+
+    if (encoded_data != nullptr) {
+      FILE *fp = BLI_fopen(filepath, "wb");
+      if (!fp) {
+        free(encoded_data);
+        fprintf(stderr, "WebP: Cannot open file for writing: '%s'\n", filepath);
+        return false;
+      }
+      fwrite(encoded_data, encoded_data_size, 1, fp);
+      free(encoded_data);
+      fclose(fp);
+    }
+
+  //   if (ibuf->foptions.quality == 100.0f) {
+  //     // NOTE:
+  //     // last_row is a uchar pointer - taint this
+  //     // ibuf->x and ibuf->y are ints
+  //     // -3 * ibuf->x is still an int
+  //     // &encoded_data is the address of encoded_data - taint this
+  //     // ibuf->foptions.quality is a char
+  //     // for verifying encoded data size, max size of a webp file is pow(2,32) - 10 bytes according
+  //     // to webp convention
+
+  //     encoded_data_size = sandbox_invoke(sandbox,
+  //                                        WebPEncodeLosslessRGB,
+  //                                        tainted_last_row,
+  //                                        ibuf->x,
+  //                                        ibuf->y,
+  //                                        -3 * ibuf->x,
+  //                                        tainted_data)
+  //                             .copy_and_verify([](unsigned ret) {
+  //                               assert(ret <= pow(2, 32) - 10);
+  //                               return ret;
+  //                             });
+  //     ;
+  //   }
+  //   else {
+  //     encoded_data_size = sandbox_invoke(sandbox,
+  //                                        WebPEncodeRGB,
+  //                                        tainted_last_row,
+  //                                        ibuf->x,
+  //                                        ibuf->y,
+  //                                        -3 * ibuf->x,
+  //                                        ibuf->foptions.quality,
+  //                                        tainted_data)
+  //                             .copy_and_verify([](unsigned ret) {
+  //                               assert(ret <= pow(2, 32) - 10);
+  //                               return ret;
+  //                             });
+  //     ;
+  //   }
+  //   MEM_freeN(rgb_rect);
+  //   sandbox.free_in_sandbox(tainted_last_row);
+  // }
+  // else if (bytesperpixel == 4) {
+  //   last_row = (uchar *)(ibuf->rect + (ibuf->y - 1) * ibuf->x);
+
+  //   auto tainted_last_row = sandbox.malloc_in_sandbox<uchar>(ibuf->x);
+  //   rlbox::memcpy(sandbox, tainted_last_row, last_row, ibuf->x);
+
+  //   if (ibuf->foptions.quality == 100.0f) {
+  //     encoded_data_size = sandbox_invoke(sandbox,
+  //                                        WebPEncodeLosslessRGBA,
+  //                                        tainted_last_row,
+  //                                        ibuf->x,
+  //                                        ibuf->y,
+  //                                        -4 * ibuf->x,
+  //                                        tainted_data)
+  //                             .copy_and_verify([](unsigned ret) {
+  //                               assert(ret <= pow(2, 32) - 10);
+  //                               return ret;
+  //                             });
+  //   }
+  //   else {
+  //     encoded_data_size = sandbox_invoke(sandbox,
+  //                                        WebPEncodeRGBA,
+  //                                        tainted_last_row,
+  //                                        ibuf->x,
+  //                                        ibuf->y,
+  //                                        -4 * ibuf->x,
+  //                                        ibuf->foptions.quality,
+  //                                        tainted_data)
+  //                             .copy_and_verify([](unsigned ret) {
+  //                               //printf("Encoding Lossy RGB... encoded data size = %d\n", ret);
+  //                               return ret <= pow(2, 32) - 10;
+  //                             });
+  //   }
+  //   sandbox.free_in_sandbox(tainted_last_row);
+  // }
+  // else {
+  //   fprintf(
+  //       stderr, "WebP: Unsupported bytes per pixel: %d for file: '%s'\n", bytesperpixel, filepath);
+  //   sandbox.free_in_sandbox(tainted_data);
+  //   sandbox.destroy_sandbox();
+  //   return false;
+  // }
+
+  // std::unique_ptr<unsigned char> wrapped_verified_data_ptr;
+
+  // wrapped_verified_data_ptr = (*tainted_data).copy_and_verify([] (std::unique_ptr<unsigned char> addr) {
+  //   assert(addr != nullptr);
+  //   return addr;
+  // });
+
+  // uchar* verified_data_ptr = wrapped_verified_data_ptr.get();
+  // encoded_data = (uchar*) malloc(encoded_data_size);
+  // memcpy(encoded_data, verified_data_ptr, encoded_data_size);
+  // sandbox.free_in_sandbox(tainted_data);
+
+  // if (encoded_data != nullptr)
+  // {
+  //   FILE *fp = BLI_fopen(filepath, "wb");
+  //   if (!fp) {
+  //     free(encoded_data);
+  //     fprintf(stderr, "WebP: Cannot open file for writing: '%s'\n", filepath);
+  //     sandbox.destroy_sandbox();
+  //     return false;
+  //   }
+  //   fwrite(encoded_data, encoded_data_size, 1, fp);
+  //   free(encoded_data);
+  //   fclose(fp);
+  // }
 
   sandbox.destroy_sandbox();
   return true;
