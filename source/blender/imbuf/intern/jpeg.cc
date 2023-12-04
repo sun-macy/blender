@@ -29,18 +29,8 @@
 #include <jerror.h>
 #include <jpeglib.h>
 
-#define RLBOX_SINGLE_THREADED_INVOCATIONS;
-#define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
-#include "../../../extern/rlbox/include/rlbox.hpp"
-#include "../../../extern/rlbox/include/rlbox_noop_sandbox.hpp"
-
 #include "IMB_colormanagement.h"
 #include "IMB_colormanagement_intern.h"
-
-using namespace std;
-using namespace rlbox;
-
-RLBOX_DEFINE_BASE_TYPES_FOR(libjpeg, noop);
 
 /* the types are from the jpeg lib */
 static void jpeg_error(j_common_ptr cinfo) ATTR_NORETURN;
@@ -267,9 +257,6 @@ static ImBuf *ibJpegImageFromCinfo(struct jpeg_decompress_struct *cinfo,
                                    size_t *r_width,
                                    size_t *r_height)
 {
-  rlbox_sandbox_libjpeg sandbox;
-  sandbox.create_sandbox();
-
   JSAMPARRAY row_pointer;
   JSAMPLE *buffer = nullptr;
   int row_stride;

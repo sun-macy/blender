@@ -15,6 +15,9 @@
 #include <stdlib.h>
 #include <webp/decode.h>
 #include <webp/encode.h>
+#include <webp/libwebp.wasm.h>
+// #include <webp/libwebpdecoder.wasm.h>
+// #include <webp/libsharpyuv.wasm.h>
 
 #include "BLI_fileops.h"
 #include "BLI_mmap.h"
@@ -30,19 +33,21 @@
 #include "MEM_guardedalloc.h"
 
 #define RLBOX_SINGLE_THREADED_INVOCATIONS
-#define RLBOX_USE_STATIC_CALLS() rlbox_noop_sandbox_lookup_symbol
+#define RLBOX_WASM2C_MODULE_NAME libwebp
+#define RLBOX_USE_STATIC_CALLS() rlbox_wasm2c_sandbox_lookup_symbol
 
+#include "rlbox.wasm.h"
 #include <rlbox.hpp>
-#include <rlbox_noop_sandbox.hpp>
+#include <rlbox_wasm2c_sandbox.hpp>
 
 // TODO: change to wasm2c sandbox eventually
-RLBOX_DEFINE_BASE_TYPES_FOR(webp, noop);
-using sandbox_type_t = rlbox::rlbox_noop_sandbox;
+RLBOX_DEFINE_BASE_TYPES_FOR(libwebp, wasm2c);
+using sandbox_type_t = rlbox::rlbox_wasm2c_sandbox;
 
 // NOTE: blender community does not like broad imports like this
 using namespace rlbox;
 
-template<typename T> using tainted_webp = rlbox::tainted<T, sandbox_type_t>;
+template<typename T> using tainted_libwebp = rlbox::tainted<T, sandbox_type_t>;
 
 // NOTE: copied from example code. not sure what this does?
 #define release_assert(cond, msg) \
@@ -141,7 +146,7 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
     auto tainted_mem = sandbox.malloc_in_sandbox<uchar>(size);
     rlbox::memcpy(sandbox, tainted_mem, mem, size);
 
-    tainted_webp<int> buf_is_a_webp 
+    tainted_libwebp<int> buf_is_a_webp 
         = sandbox_invoke(sandbox, WebPGetInfo, tainted_mem, size, nullptr, nullptr);
 
     if ((buf_is_a_webp == 0).unverified_safe_because("worst case is early exit")) {
@@ -152,11 +157,11 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
 
     colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_BYTE);
 
-    tainted_webp<WebPBitstreamFeatures *> tainted_features 
+    tainted_libwebp<WebPBitstreamFeatures *> tainted_features 
         = sandbox.malloc_in_sandbox<WebPBitstreamFeatures>(sizeof(WebPBitstreamFeatures));
 
-    tainted_webp<VP8StatusCode> can_parse_features 
-        = sandbox_invoke(sandbox, WebPGetFeatures, tainted_mem, size, tainted_features);
+    tainted_libwebp<VP8StatusCode> can_parse_features 
+        = sandbox_invoke(sandbox, WebPGetFeaturesInternal, tainted_mem, size, tainted_features, 0x0209);
 
     if ((can_parse_features != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) {
         fprintf(stderr, "WebP: Failed to parse features\n");
@@ -194,13 +199,13 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
         /* Flip the image during decoding to match Blender. */
         const size_t num_pixels = ibuf->x * ibuf->y;
 
-        tainted_webp<unsigned int*> tainted_buffer
+        tainted_libwebp<unsigned int*> tainted_buffer
             = sandbox.malloc_in_sandbox<unsigned int>(num_pixels * 4);
 
         unsigned int* buffer 
             = tainted_buffer.unverified_safe_pointer_because(num_pixels * 4, "we just allocated this");
 
-        tainted_webp<uchar*> tainted_last_row 
+        tainted_libwebp<uchar*> tainted_last_row 
             = sandbox_reinterpret_cast<uchar*>(tainted_buffer + (ibuf->y - 1) * ibuf->x);
 
         auto tainted_decode_rgba_into 
@@ -261,17 +266,17 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     auto tainted_data = sandbox.malloc_in_sandbox<uchar>(data_size);
     rlbox::memcpy(sandbox, tainted_data, data, data_size);
 
-    tainted_webp<WebPDecoderConfig *> tainted_config 
+    tainted_libwebp<WebPDecoderConfig *> tainted_config 
         = sandbox.malloc_in_sandbox<WebPDecoderConfig>(sizeof(WebPDecoderConfig));
 
-    tainted_webp<int> can_obtain_config 
-        = sandbox_invoke(sandbox, WebPInitDecoderConfig, tainted_config);
+    tainted_libwebp<int> can_obtain_config 
+        = sandbox_invoke(sandbox, WebPInitDecoderConfigInternal, tainted_config, 0x0209);
 
-    tainted_webp<WebPBitstreamFeatures *> tainted_config_input 
+    tainted_libwebp<WebPBitstreamFeatures *> tainted_config_input 
         = sandbox_reinterpret_cast<WebPBitstreamFeatures *>(tainted_config);
 
-    tainted_webp<VP8StatusCode> can_get_features 
-        = sandbox_invoke(sandbox, WebPGetFeatures, tainted_data, data_size, tainted_config_input);
+    tainted_libwebp<VP8StatusCode> can_get_features 
+        = sandbox_invoke(sandbox, WebPGetFeaturesInternal, tainted_data, data_size, tainted_config_input, 0x0209);
 
     if ((can_obtain_config == 0).unverified_safe_because("worst case is early exit") ||
         (can_get_features != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) 
@@ -333,7 +338,7 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     tainted_config->output.u.RGBA.size = size_t(stride * ibuf->y);
 
 
-    tainted_webp<VP8StatusCode> decode_is_okay 
+    tainted_libwebp<VP8StatusCode> decode_is_okay 
         = sandbox_invoke(sandbox, WebPDecode, tainted_data, data_size, tainted_config);
     if ((decode_is_okay != VP8_STATUS_OK).unverified_safe_because("worst case is early exit")) {
         fprintf(stderr, "WebP: Failed to decode image\n");
@@ -347,7 +352,7 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
     }
 
     /* Free the output buffer. */
-    tainted_webp<WebPDecBuffer *> tainted_config_output 
+    tainted_libwebp<WebPDecBuffer *> tainted_config_output 
         = sandbox_reinterpret_cast<WebPDecBuffer *>
             (sandbox_reinterpret_cast<char *>(tainted_config) + sizeof(WebPBitstreamFeatures));
 
@@ -371,7 +376,7 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
     rlbox_sandbox<sandbox_type_t> sandbox;
     sandbox.create_sandbox();
 
-    tainted_webp<uchar **> tainted_data = sandbox.malloc_in_sandbox<uchar *>(sizeof(uchar *));
+    tainted_libwebp<uchar **> tainted_data = sandbox.malloc_in_sandbox<uchar *>(sizeof(uchar *));
 
     if (bytesperpixel == 3) {
         /* We must convert the ImBuf RGBA buffer to RGB as WebP expects a RGB buffer. */
@@ -385,12 +390,12 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
             rgb_rect[i * 3 + 2] = rgba_rect[i * 4 + 2];
         }
 
-        tainted_webp<uint8_t *> tainted_rgb_rect 
+        tainted_libwebp<uint8_t *> tainted_rgb_rect 
             = sandbox.malloc_in_sandbox<uint8_t>(sizeof(uint8_t) * num_pixels * 3);
 
         rlbox::memcpy(sandbox, tainted_rgb_rect, rgb_rect, sizeof(uint8_t) * num_pixels * 3);
 
-        tainted_webp<uchar *> tainted_last_row 
+        tainted_libwebp<uchar *> tainted_last_row 
             = sandbox_static_cast<uchar *>(tainted_rgb_rect + (ibuf->y - 1) * ibuf->x * 3);
 
         if (ibuf->foptions.quality == 100.0f) {
@@ -428,7 +433,7 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
     } else if (bytesperpixel == 4) {
         const size_t num_pixels = ibuf->x * ibuf->y;
 
-        tainted_webp<unsigned int *> tainted_rgba_rect 
+        tainted_libwebp<unsigned int *> tainted_rgba_rect 
             = sandbox.malloc_in_sandbox<unsigned int>(sizeof(unsigned int) * num_pixels);
 
         rlbox::memcpy(sandbox,
@@ -436,7 +441,7 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
                     (unsigned int *)ibuf->rect,
                     sizeof(unsigned int *) * num_pixels);
 
-        tainted_webp<uchar *> tainted_last_row 
+        tainted_libwebp<uchar *> tainted_last_row 
             = sandbox_reinterpret_cast<uchar *>(tainted_rgba_rect + (ibuf->y - 1) * ibuf->x);
 
         if (ibuf->foptions.quality == 100.0f) {
@@ -478,7 +483,7 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
         return false;
     }
 
-    tainted_webp<uchar*> derefd_tainted_data = *tainted_data;
+    tainted_libwebp<uchar*> derefd_tainted_data = *tainted_data;
 
     encoded_data = derefd_tainted_data.unverified_safe_pointer_because(encoded_data_size, 
                 "it has to point to sandbox memory");
