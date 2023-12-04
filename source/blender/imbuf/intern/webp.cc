@@ -36,7 +36,6 @@
 #define RLBOX_WASM2C_MODULE_NAME libwebp
 #define RLBOX_USE_STATIC_CALLS() rlbox_wasm2c_sandbox_lookup_symbol
 
-#include "rlbox.wasm.h"
 #include <rlbox.hpp>
 #include <rlbox_wasm2c_sandbox.hpp>
 
