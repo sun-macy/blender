@@ -16,8 +16,6 @@
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/libwebp.wasm.h>
-// #include <webp/libwebpdecoder.wasm.h>
-// #include <webp/libsharpyuv.wasm.h>
 
 #include "BLI_fileops.h"
 #include "BLI_mmap.h"
@@ -38,8 +36,11 @@
 
 #include <rlbox.hpp>
 #include <rlbox_wasm2c_sandbox.hpp>
+#include <iostream>
+#include <ctime>
+#include <ratio>
+#include <chrono>
 
-// TODO: change to wasm2c sandbox eventually
 RLBOX_DEFINE_BASE_TYPES_FOR(libwebp, wasm2c);
 using sandbox_type_t = rlbox::rlbox_wasm2c_sandbox;
 
@@ -48,7 +49,6 @@ using namespace rlbox;
 
 template<typename T> using tainted_libwebp = rlbox::tainted<T, sandbox_type_t>;
 
-// NOTE: copied from example code. not sure what this does?
 #define release_assert(cond, msg) \
   if (!(cond)) { \
     fputs(msg, stderr); \
@@ -87,7 +87,6 @@ template<typename T> using tainted_libwebp = rlbox::tainted<T, sandbox_type_t>;
     f(WebPRGBABuffer, RGBA, FIELD_NORMAL, ##__VA_ARGS__) g()                    \
     f(WebPYUVABuffer, YUVA, FIELD_NORMAL, ##__VA_ARGS__) g()
 
-// TODO: check if this WEBP_CSP_MODE enum type is okay
 #define sandbox_fields_reflection_webp_class_WebPDecBuffer(f, g, ...)   \
     f(WEBP_CSP_MODE, colorspace, FIELD_NORMAL, ##__VA_ARGS__) g()       \
     f(int, width, FIELD_NORMAL, ##__VA_ARGS__) g()                      \
@@ -130,7 +129,7 @@ template<typename T> using tainted_libwebp = rlbox::tainted<T, sandbox_type_t>;
 
 rlbox_load_structs_from_library(webp);
 
-// NOTE: inlined this code where used so we don't have to figure out parameter types for now
+// inlined this code where used so we don't have to figure out parameter types
 bool imb_is_a_webp(const uchar *buf, size_t size) {
     if (WebPGetInfo(buf, size, nullptr, nullptr)) {
         return true;
@@ -139,6 +138,10 @@ bool imb_is_a_webp(const uchar *buf, size_t size) {
 }
 
 ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE]) {
+    // performance testing
+    using namespace std::chrono;
+    high_resolution_clock::time_point t1 = high_resolution_clock::now();
+    
     rlbox_sandbox<sandbox_type_t> sandbox;
     sandbox.create_sandbox();
 
@@ -224,6 +227,11 @@ ImBuf *imb_loadwebp(const uchar *mem, size_t size, int flags, char colorspace[IM
     }
     sandbox.free_in_sandbox(tainted_mem);
     sandbox.destroy_sandbox();
+
+    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+    duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+    printf("webp loading time is %f\n", time_span.count());
+
     return ibuf;
 }
 
@@ -313,7 +321,6 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
         return nullptr;
     }
 
-
     tainted_config->options.no_fancy_upsampling = 1;
     tainted_config->options.use_scaling = 1;
     tainted_config->options.scaled_width = dest_w;
@@ -368,6 +375,10 @@ struct ImBuf *imb_load_filepath_thumbnail_webp(const char *filepath,
 }
 
 bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
+    // performance testing
+    using namespace std::chrono;
+    high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
     const int bytesperpixel = (ibuf->planes + 7) >> 3;
     uchar *encoded_data;
     size_t encoded_data_size;
@@ -501,5 +512,10 @@ bool imb_savewebp(struct ImBuf *ibuf, const char *filepath, int /*flags*/) {
 
     sandbox.free_in_sandbox(tainted_data);
     sandbox.destroy_sandbox();
+
+    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+    duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+    printf("webp saving time is %f\n", time_span.count());
+
     return true;
 }
